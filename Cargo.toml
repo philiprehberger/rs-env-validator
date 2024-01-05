@@ -1,0 +1,10 @@
+[package]
+name = "philiprehberger-env-validator"
+version = "0.1.0"
+edition = "2021"
+authors = ["Philip Rehberger"]
+description = "Typed environment variable validation with batch error reporting for Rust"
+license = "MIT"
+repository = "https://github.com/philiprehberger/rs-env-validator"
+keywords = ["env", "environment", "validation", "config", "dotenv"]
+categories = ["config", "development-tools"]
