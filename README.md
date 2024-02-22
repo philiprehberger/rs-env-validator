@@ -25,6 +25,18 @@ let config = Schema::new()
 let port = config["PORT"].as_int().unwrap();
 ```
 
+### Float and URL Fields
+
+```rust
+let config = Schema::new()
+    .float("RATE_LIMIT").default_value("1.5").build()
+    .url("API_ENDPOINT").build()
+    .validate()?;
+
+let rate = config["RATE_LIMIT"].as_float().unwrap();
+let endpoint = config["API_ENDPOINT"].as_str().unwrap();
+```
+
 ### With Choices
 
 ```rust
