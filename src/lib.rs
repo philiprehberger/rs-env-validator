@@ -4,7 +4,7 @@ use std::fmt;
 use std::str::FromStr;
 
 /// Error containing all validation failures.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ValidationError {
     pub errors: Vec<String>,
 }
@@ -42,7 +42,7 @@ pub struct FieldSpec {
 }
 
 /// Schema builder for environment variable validation.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Schema {
     fields: Vec<FieldSpec>,
 }
@@ -208,6 +208,59 @@ impl EnvValue {
             EnvValue::Bool(b) => Some(*b),
             _ => None,
         }
+    }
+}
+
+impl fmt::Display for EnvValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EnvValue::Str(s) => write!(f, "{}", s),
+            EnvValue::Int(n) => write!(f, "{}", n),
+            EnvValue::Float(v) => write!(f, "{}", v),
+            EnvValue::Bool(b) => write!(f, "{}", b),
+        }
+    }
+}
+
+impl PartialEq for EnvValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (EnvValue::Str(a), EnvValue::Str(b)) => a == b,
+            (EnvValue::Int(a), EnvValue::Int(b)) => a == b,
+            (EnvValue::Float(a), EnvValue::Float(b)) => a.to_bits() == b.to_bits(),
+            (EnvValue::Bool(a), EnvValue::Bool(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl From<String> for EnvValue {
+    fn from(s: String) -> Self {
+        EnvValue::Str(s)
+    }
+}
+
+impl From<&str> for EnvValue {
+    fn from(s: &str) -> Self {
+        EnvValue::Str(s.to_string())
+    }
+}
+
+impl From<i64> for EnvValue {
+    fn from(n: i64) -> Self {
+        EnvValue::Int(n)
+    }
+}
+
+impl From<f64> for EnvValue {
+    fn from(v: f64) -> Self {
+        EnvValue::Float(v)
+    }
+}
+
+impl From<bool> for EnvValue {
+    fn from(b: bool) -> Self {
+        EnvValue::Bool(b)
     }
 }
 
@@ -457,5 +510,54 @@ mod tests {
         assert!(display.contains("2 validation error(s)"));
         assert!(display.contains("error one"));
         assert!(display.contains("error two"));
+    }
+
+    #[test]
+    fn test_env_value_display() {
+        assert_eq!(format!("{}", EnvValue::Str("hello".into())), "hello");
+        assert_eq!(format!("{}", EnvValue::Int(42)), "42");
+        assert_eq!(format!("{}", EnvValue::Float(3.14)), "3.14");
+        assert_eq!(format!("{}", EnvValue::Bool(true)), "true");
+    }
+
+    #[test]
+    fn test_env_value_partial_eq() {
+        assert_eq!(EnvValue::Str("a".into()), EnvValue::Str("a".into()));
+        assert_ne!(EnvValue::Str("a".into()), EnvValue::Str("b".into()));
+        assert_eq!(EnvValue::Int(1), EnvValue::Int(1));
+        assert_ne!(EnvValue::Int(1), EnvValue::Int(2));
+        assert_eq!(EnvValue::Float(1.5), EnvValue::Float(1.5));
+        assert_ne!(EnvValue::Float(1.5), EnvValue::Float(2.5));
+        assert_eq!(EnvValue::Bool(true), EnvValue::Bool(true));
+        assert_ne!(EnvValue::Bool(true), EnvValue::Bool(false));
+        assert_ne!(EnvValue::Int(1), EnvValue::Str("1".into()));
+    }
+
+    #[test]
+    fn test_env_value_from_impls() {
+        assert_eq!(EnvValue::from("hello"), EnvValue::Str("hello".into()));
+        assert_eq!(EnvValue::from("hello".to_string()), EnvValue::Str("hello".into()));
+        assert_eq!(EnvValue::from(42i64), EnvValue::Int(42));
+        assert_eq!(EnvValue::from(3.14f64), EnvValue::Float(3.14));
+        assert_eq!(EnvValue::from(true), EnvValue::Bool(true));
+    }
+
+    #[test]
+    fn test_schema_clone() {
+        let src = source(&[("HOST", "localhost")]);
+        let schema = Schema::new().string("HOST").build();
+        let schema2 = schema.clone();
+        let r1 = schema.validate_from(Some(&src)).unwrap();
+        let r2 = schema2.validate_from(Some(&src)).unwrap();
+        assert_eq!(r1["HOST"], r2["HOST"]);
+    }
+
+    #[test]
+    fn test_validation_error_partial_eq() {
+        let e1 = ValidationError { errors: vec!["a".into()] };
+        let e2 = ValidationError { errors: vec!["a".into()] };
+        let e3 = ValidationError { errors: vec!["b".into()] };
+        assert_eq!(e1, e2);
+        assert_ne!(e1, e3);
     }
 }
