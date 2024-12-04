@@ -10,7 +10,7 @@ Typed environment variable validation with batch error reporting for Rust.
 
 ```toml
 [dependencies]
-philiprehberger-env-validator = "0.3"
+philiprehberger-env-validator = "0.3.4"
 ```
 
 ## Usage
