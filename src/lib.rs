@@ -3,13 +3,13 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use philiprehberger_env_validator::EnvValidator;
+//! use philiprehberger_env_validator::Schema;
 //!
-//! let config = EnvValidator::new()
-//!     .required("DATABASE_URL")
-//!     .optional("LOG_LEVEL", "info")
+//! let config = Schema::new()
+//!     .string("DATABASE_URL").required(true).build()
+//!     .string("LOG_LEVEL").default_value("info").build()
 //!     .validate()
-//!     .expect("missing env vars");
+//!     .expect("validation failed");
 //! ```
 
 use std::collections::HashMap;
