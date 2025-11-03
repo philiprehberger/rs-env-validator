@@ -3,6 +3,7 @@
 [![CI](https://github.com/philiprehberger/rs-env-validator/actions/workflows/ci.yml/badge.svg)](https://github.com/philiprehberger/rs-env-validator/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/philiprehberger-env-validator.svg)](https://crates.io/crates/philiprehberger-env-validator)
 [![License](https://img.shields.io/github/license/philiprehberger/rs-env-validator)](LICENSE)
+[![Sponsor](https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ec6cb9)](https://github.com/sponsors/philiprehberger)
 
 Typed environment variable validation with batch error reporting for Rust
 
