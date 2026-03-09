@@ -1,0 +1,64 @@
+# rs-env-validator
+
+Typed environment variable validation with batch error reporting for Rust.
+
+## Installation
+
+```toml
+[dependencies]
+philiprehberger-env-validator = "0.1"
+```
+
+## Usage
+
+### Basic Validation
+
+```rust
+use philiprehberger_env_validator::Schema;
+
+let config = Schema::new()
+    .string("DATABASE_URL").build()
+    .integer("PORT").default_value("3000").build()
+    .boolean("DEBUG").default_value("false").build()
+    .validate()?;
+
+let port = config["PORT"].as_int().unwrap();
+```
+
+### With Choices
+
+```rust
+let config = Schema::new()
+    .string("APP_ENV").choices(&["development", "staging", "production"]).build()
+    .validate()?;
+```
+
+### Custom Source (Testing)
+
+```rust
+use std::collections::HashMap;
+
+let mut source = HashMap::new();
+source.insert("PORT".to_string(), "8080".to_string());
+
+let config = Schema::new()
+    .integer("PORT").build()
+    .validate_from(Some(&source))?;
+```
+
+### Error Handling
+
+```rust
+match schema.validate() {
+    Ok(config) => { /* use config */ }
+    Err(e) => {
+        for error in &e.errors {
+            eprintln!("{}", error);
+        }
+    }
+}
+```
+
+## License
+
+MIT
