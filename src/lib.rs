@@ -52,47 +52,24 @@ impl Schema {
         Self::default()
     }
 
-    pub fn string(mut self, name: &str) -> FieldSpecBuilder {
-        FieldSpecBuilder {
-            schema: &mut self as *mut Schema,
-            spec: FieldSpec {
-                name: name.to_string(),
-                field_type: FieldType::Str,
-                required: true,
-                default: None,
-                choices: None,
-            },
-        }
+    pub fn string(self, name: &str) -> FieldSpecBuilder {
+        FieldSpecBuilder::new(self, name, FieldType::Str)
     }
 
-    pub fn integer(mut self, name: &str) -> FieldSpecBuilder {
-        FieldSpecBuilder {
-            schema: &mut self as *mut Schema,
-            spec: FieldSpec {
-                name: name.to_string(),
-                field_type: FieldType::Int,
-                required: true,
-                default: None,
-                choices: None,
-            },
-        }
+    pub fn integer(self, name: &str) -> FieldSpecBuilder {
+        FieldSpecBuilder::new(self, name, FieldType::Int)
     }
 
-    pub fn boolean(mut self, name: &str) -> FieldSpecBuilder {
-        FieldSpecBuilder {
-            schema: &mut self as *mut Schema,
-            spec: FieldSpec {
-                name: name.to_string(),
-                field_type: FieldType::Bool,
-                required: true,
-                default: None,
-                choices: None,
-            },
-        }
+    pub fn float(self, name: &str) -> FieldSpecBuilder {
+        FieldSpecBuilder::new(self, name, FieldType::Float)
     }
 
-    fn add_field(&mut self, spec: FieldSpec) {
-        self.fields.push(spec);
+    pub fn boolean(self, name: &str) -> FieldSpecBuilder {
+        FieldSpecBuilder::new(self, name, FieldType::Bool)
+    }
+
+    pub fn url(self, name: &str) -> FieldSpecBuilder {
+        FieldSpecBuilder::new(self, name, FieldType::Url)
     }
 
     /// Validate environment variables and return a map of parsed values.
@@ -101,7 +78,10 @@ impl Schema {
     }
 
     /// Validate from a custom source map.
-    pub fn validate_from(&self, source: Option<&HashMap<String, String>>) -> Result<HashMap<String, EnvValue>, ValidationError> {
+    pub fn validate_from(
+        &self,
+        source: Option<&HashMap<String, String>>,
+    ) -> Result<HashMap<String, EnvValue>, ValidationError> {
         let mut errors = Vec::new();
         let mut result = HashMap::new();
 
@@ -127,13 +107,18 @@ impl Schema {
 
             if let Some(ref choices) = spec.choices {
                 if !choices.contains(&raw) {
-                    errors.push(format!("{} must be one of {:?}, got '{}'", spec.name, choices, raw));
+                    errors.push(format!(
+                        "{} must be one of {:?}, got '{}'",
+                        spec.name, choices, raw
+                    ));
                     continue;
                 }
             }
 
             match parse_value(&raw, &spec.field_type) {
-                Ok(val) => { result.insert(spec.name.clone(), val); }
+                Ok(val) => {
+                    result.insert(spec.name.clone(), val);
+                }
                 Err(msg) => errors.push(format!("{}: {}", spec.name, msg)),
             }
         }
@@ -148,11 +133,24 @@ impl Schema {
 
 /// Builder for field specifications.
 pub struct FieldSpecBuilder {
-    schema: *mut Schema,
+    schema: Schema,
     spec: FieldSpec,
 }
 
 impl FieldSpecBuilder {
+    fn new(schema: Schema, name: &str, field_type: FieldType) -> Self {
+        Self {
+            schema,
+            spec: FieldSpec {
+                name: name.to_string(),
+                field_type,
+                required: true,
+                default: None,
+                choices: None,
+            },
+        }
+    }
+
     pub fn required(mut self, r: bool) -> Self {
         self.spec.required = r;
         self
@@ -168,11 +166,9 @@ impl FieldSpecBuilder {
         self
     }
 
-    pub fn build(self) -> Schema {
-        unsafe {
-            (*self.schema).add_field(self.spec);
-            std::ptr::read(self.schema)
-        }
+    pub fn build(mut self) -> Schema {
+        self.schema.fields.push(self.spec);
+        self.schema
     }
 }
 
@@ -236,5 +232,230 @@ fn parse_value(raw: &str, field_type: &FieldType) -> Result<EnvValue, String> {
                 Err(format!("'{}' is not a valid URL", raw))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn source(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn test_required_field_present() {
+        let src = source(&[("HOST", "localhost")]);
+        let result = Schema::new()
+            .string("HOST")
+            .build()
+            .validate_from(Some(&src))
+            .unwrap();
+        assert_eq!(result["HOST"].as_str().unwrap(), "localhost");
+    }
+
+    #[test]
+    fn test_required_field_missing() {
+        let src = source(&[]);
+        let err = Schema::new()
+            .string("HOST")
+            .build()
+            .validate_from(Some(&src))
+            .unwrap_err();
+        assert_eq!(err.errors.len(), 1);
+        assert!(err.errors[0].contains("missing required variable"));
+    }
+
+    #[test]
+    fn test_optional_field_missing() {
+        let src = source(&[]);
+        let result = Schema::new()
+            .string("HOST")
+            .required(false)
+            .build()
+            .validate_from(Some(&src))
+            .unwrap();
+        assert!(!result.contains_key("HOST"));
+    }
+
+    #[test]
+    fn test_default_value() {
+        let src = source(&[]);
+        let result = Schema::new()
+            .integer("PORT")
+            .default_value("3000")
+            .build()
+            .validate_from(Some(&src))
+            .unwrap();
+        assert_eq!(result["PORT"].as_int().unwrap(), 3000);
+    }
+
+    #[test]
+    fn test_integer_parsing() {
+        let src = source(&[("PORT", "8080")]);
+        let result = Schema::new()
+            .integer("PORT")
+            .build()
+            .validate_from(Some(&src))
+            .unwrap();
+        assert_eq!(result["PORT"].as_int().unwrap(), 8080);
+    }
+
+    #[test]
+    fn test_integer_invalid() {
+        let src = source(&[("PORT", "abc")]);
+        let err = Schema::new()
+            .integer("PORT")
+            .build()
+            .validate_from(Some(&src))
+            .unwrap_err();
+        assert!(err.errors[0].contains("cannot convert"));
+    }
+
+    #[test]
+    fn test_float_parsing() {
+        let src = source(&[("RATE", "3.14")]);
+        let result = Schema::new()
+            .float("RATE")
+            .build()
+            .validate_from(Some(&src))
+            .unwrap();
+        assert!((result["RATE"].as_float().unwrap() - 3.14).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_boolean_variants() {
+        for (input, expected) in &[
+            ("true", true),
+            ("1", true),
+            ("yes", true),
+            ("on", true),
+            ("false", false),
+            ("0", false),
+            ("no", false),
+            ("off", false),
+        ] {
+            let src = source(&[("FLAG", input)]);
+            let result = Schema::new()
+                .boolean("FLAG")
+                .build()
+                .validate_from(Some(&src))
+                .unwrap();
+            assert_eq!(result["FLAG"].as_bool().unwrap(), *expected);
+        }
+    }
+
+    #[test]
+    fn test_boolean_invalid() {
+        let src = source(&[("FLAG", "maybe")]);
+        let err = Schema::new()
+            .boolean("FLAG")
+            .build()
+            .validate_from(Some(&src))
+            .unwrap_err();
+        assert!(err.errors[0].contains("cannot convert"));
+    }
+
+    #[test]
+    fn test_url_valid() {
+        let src = source(&[("API", "https://example.com")]);
+        let result = Schema::new()
+            .url("API")
+            .build()
+            .validate_from(Some(&src))
+            .unwrap();
+        assert_eq!(result["API"].as_str().unwrap(), "https://example.com");
+    }
+
+    #[test]
+    fn test_url_invalid() {
+        let src = source(&[("API", "not-a-url")]);
+        let err = Schema::new()
+            .url("API")
+            .build()
+            .validate_from(Some(&src))
+            .unwrap_err();
+        assert!(err.errors[0].contains("not a valid URL"));
+    }
+
+    #[test]
+    fn test_choices_valid() {
+        let src = source(&[("ENV", "production")]);
+        let result = Schema::new()
+            .string("ENV")
+            .choices(&["development", "staging", "production"])
+            .build()
+            .validate_from(Some(&src))
+            .unwrap();
+        assert_eq!(result["ENV"].as_str().unwrap(), "production");
+    }
+
+    #[test]
+    fn test_choices_invalid() {
+        let src = source(&[("ENV", "testing")]);
+        let err = Schema::new()
+            .string("ENV")
+            .choices(&["development", "staging", "production"])
+            .build()
+            .validate_from(Some(&src))
+            .unwrap_err();
+        assert!(err.errors[0].contains("must be one of"));
+    }
+
+    #[test]
+    fn test_multiple_errors() {
+        let src = source(&[]);
+        let err = Schema::new()
+            .string("A")
+            .build()
+            .string("B")
+            .build()
+            .string("C")
+            .build()
+            .validate_from(Some(&src))
+            .unwrap_err();
+        assert_eq!(err.errors.len(), 3);
+    }
+
+    #[test]
+    fn test_multiple_fields_valid() {
+        let src = source(&[("HOST", "localhost"), ("PORT", "8080"), ("DEBUG", "true")]);
+        let result = Schema::new()
+            .string("HOST")
+            .build()
+            .integer("PORT")
+            .build()
+            .boolean("DEBUG")
+            .build()
+            .validate_from(Some(&src))
+            .unwrap();
+        assert_eq!(result["HOST"].as_str().unwrap(), "localhost");
+        assert_eq!(result["PORT"].as_int().unwrap(), 8080);
+        assert_eq!(result["DEBUG"].as_bool().unwrap(), true);
+    }
+
+    #[test]
+    fn test_empty_value_treated_as_missing() {
+        let src = source(&[("HOST", "")]);
+        let err = Schema::new()
+            .string("HOST")
+            .build()
+            .validate_from(Some(&src))
+            .unwrap_err();
+        assert!(err.errors[0].contains("missing required variable"));
+    }
+
+    #[test]
+    fn test_display_validation_error() {
+        let err = ValidationError {
+            errors: vec!["error one".to_string(), "error two".to_string()],
+        };
+        let display = format!("{}", err);
+        assert!(display.contains("2 validation error(s)"));
+        assert!(display.contains("error one"));
+        assert!(display.contains("error two"));
     }
 }
