@@ -6,7 +6,7 @@ Typed environment variable validation with batch error reporting for Rust.
 
 ```toml
 [dependencies]
-philiprehberger-env-validator = "0.1"
+philiprehberger-env-validator = "0.3"
 ```
 
 ## Usage
@@ -69,6 +69,23 @@ match schema.validate() {
         }
     }
 }
+```
+
+### Type Conversions
+
+```rust
+use philiprehberger_env_validator::EnvValue;
+
+let val: EnvValue = "hello".into();
+let val: EnvValue = 42i64.into();
+let val: EnvValue = 3.14f64.into();
+let val: EnvValue = true.into();
+
+// Display
+println!("{}", val); // "true"
+
+// Compare
+assert_eq!(EnvValue::from(42i64), EnvValue::Int(42));
 ```
 
 ## License
