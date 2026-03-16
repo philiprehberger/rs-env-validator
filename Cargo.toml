@@ -1,6 +1,6 @@
 [package]
 name = "philiprehberger-env-validator"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 authors = ["Philip Rehberger"]
 description = "Typed environment variable validation with batch error reporting for Rust"
