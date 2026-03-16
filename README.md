@@ -1,5 +1,9 @@
 # rs-env-validator
 
+[![CI](https://github.com/philiprehberger/rs-env-validator/actions/workflows/ci.yml/badge.svg)](https://github.com/philiprehberger/rs-env-validator/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/philiprehberger-env-validator.svg)](https://crates.io/crates/philiprehberger-env-validator)
+[![License](https://img.shields.io/github/license/philiprehberger/rs-env-validator)](LICENSE)
+
 Typed environment variable validation with batch error reporting for Rust.
 
 ## Installation
