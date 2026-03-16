@@ -10,7 +10,7 @@ Typed environment variable validation with batch error reporting for Rust.
 
 ```toml
 [dependencies]
-philiprehberger-env-validator = "0.3.4"
+philiprehberger-env-validator = "0.3.5"
 ```
 
 ## Usage
@@ -90,6 +90,14 @@ println!("{}", val); // "true"
 
 // Compare
 assert_eq!(EnvValue::from(42i64), EnvValue::Int(42));
+```
+
+
+## Development
+
+```bash
+cargo test
+cargo clippy -- -D warnings
 ```
 
 ## License
