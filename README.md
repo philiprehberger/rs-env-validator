@@ -4,7 +4,7 @@
 [![Crates.io](https://img.shields.io/crates/v/philiprehberger-env-validator.svg)](https://crates.io/crates/philiprehberger-env-validator)
 [![License](https://img.shields.io/github/license/philiprehberger/rs-env-validator)](LICENSE)
 
-Typed environment variable validation with batch error reporting for Rust.
+Typed environment variable validation with batch error reporting for Rust
 
 ## Installation
 
@@ -92,6 +92,25 @@ println!("{}", val); // "true"
 assert_eq!(EnvValue::from(42i64), EnvValue::Int(42));
 ```
 
+
+## API
+
+| Function / Type | Description |
+|-----------------|-------------|
+| `Schema::new()` | Create a new empty validation schema |
+| `schema.string(name)` | Add a string field to the schema |
+| `schema.integer(name)` | Add an integer field to the schema |
+| `schema.float(name)` | Add a float field to the schema |
+| `schema.boolean(name)` | Add a boolean field to the schema |
+| `schema.url(name)` | Add a URL field to the schema |
+| `builder.required(bool)` | Set whether the field is required (default: true) |
+| `builder.default_value(v)` | Set a default value for the field |
+| `builder.choices(list)` | Restrict allowed values to a set of choices |
+| `builder.build()` | Finalize the field and return the schema |
+| `schema.validate()` | Validate from environment variables |
+| `schema.validate_from(source)` | Validate from a custom `HashMap` source |
+| `EnvValue` | Enum: `Str`, `Int`, `Float`, `Bool` |
+| `ValidationError` | Error containing a `Vec<String>` of all failures |
 
 ## Development
 
