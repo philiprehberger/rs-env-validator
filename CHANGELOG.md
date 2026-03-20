@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.6
+
+- Add crate-level documentation with usage examples
+
 ## 0.3.5 (2026-03-17)
 
 - Add readme, rust-version, documentation to Cargo.toml

@@ -1,3 +1,17 @@
+//! Typed environment variable validation with batch error reporting.
+//!
+//! # Example
+//!
+//! ```rust,no_run
+//! use philiprehberger_env_validator::EnvValidator;
+//!
+//! let config = EnvValidator::new()
+//!     .required("DATABASE_URL")
+//!     .optional("LOG_LEVEL", "info")
+//!     .validate()
+//!     .expect("missing env vars");
+//! ```
+
 use std::collections::HashMap;
 use std::env;
 use std::fmt;
