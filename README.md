@@ -10,12 +10,10 @@ Typed environment variable validation with batch error reporting for Rust
 
 ```toml
 [dependencies]
-philiprehberger-env-validator = "0.3.6"
+philiprehberger-env-validator = "0.3.7"
 ```
 
 ## Usage
-
-### Basic Validation
 
 ```rust
 use philiprehberger_env_validator::Schema;
