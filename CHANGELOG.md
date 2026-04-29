@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 (2026-04-28)
+
+- Add `min(v)` / `max(v)` numeric range validators for `integer` and `float` fields
+- Add `min_length(n)` / `max_length(n)` string length validators for `string` and `url` fields
+- Add `EnvValue::as_string()` returning an owned `String` regardless of variant
+- Add `Schema::field_count()` introspection helper
+
 ## 0.3.9 (2026-03-31)
 
 - Standardize README to 3-badge format with emoji Support section

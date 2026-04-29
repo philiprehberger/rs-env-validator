@@ -53,6 +53,10 @@ pub struct FieldSpec {
     pub required: bool,
     pub default: Option<String>,
     pub choices: Option<Vec<String>>,
+    pub min: Option<f64>,
+    pub max: Option<f64>,
+    pub min_length: Option<usize>,
+    pub max_length: Option<usize>,
 }
 
 /// Schema builder for environment variable validation.
@@ -84,6 +88,11 @@ impl Schema {
 
     pub fn url(self, name: &str) -> FieldSpecBuilder {
         FieldSpecBuilder::new(self, name, FieldType::Url)
+    }
+
+    /// Returns the number of fields registered in the schema.
+    pub fn field_count(&self) -> usize {
+        self.fields.len()
     }
 
     /// Validate environment variables and return a map of parsed values.
@@ -131,7 +140,11 @@ impl Schema {
 
             match parse_value(&raw, &spec.field_type) {
                 Ok(val) => {
-                    result.insert(spec.name.clone(), val);
+                    if let Some(msg) = check_constraints(spec, &val, &raw) {
+                        errors.push(format!("{}: {}", spec.name, msg));
+                    } else {
+                        result.insert(spec.name.clone(), val);
+                    }
                 }
                 Err(msg) => errors.push(format!("{}: {}", spec.name, msg)),
             }
@@ -161,6 +174,10 @@ impl FieldSpecBuilder {
                 required: true,
                 default: None,
                 choices: None,
+                min: None,
+                max: None,
+                min_length: None,
+                max_length: None,
             },
         }
     }
@@ -180,10 +197,78 @@ impl FieldSpecBuilder {
         self
     }
 
+    /// Set the minimum allowed numeric value (for `integer` and `float` fields).
+    pub fn min(mut self, v: f64) -> Self {
+        self.spec.min = Some(v);
+        self
+    }
+
+    /// Set the maximum allowed numeric value (for `integer` and `float` fields).
+    pub fn max(mut self, v: f64) -> Self {
+        self.spec.max = Some(v);
+        self
+    }
+
+    /// Set the minimum allowed string length (for `string` and `url` fields).
+    pub fn min_length(mut self, n: usize) -> Self {
+        self.spec.min_length = Some(n);
+        self
+    }
+
+    /// Set the maximum allowed string length (for `string` and `url` fields).
+    pub fn max_length(mut self, n: usize) -> Self {
+        self.spec.max_length = Some(n);
+        self
+    }
+
     pub fn build(mut self) -> Schema {
         self.schema.fields.push(self.spec);
         self.schema
     }
+}
+
+fn check_constraints(spec: &FieldSpec, value: &EnvValue, raw: &str) -> Option<String> {
+    // Numeric range checks
+    let numeric = match value {
+        EnvValue::Int(n) => Some(*n as f64),
+        EnvValue::Float(f) => Some(*f),
+        _ => None,
+    };
+    if let Some(n) = numeric {
+        if let Some(min) = spec.min {
+            if n < min {
+                return Some(format!("{} is less than minimum {}", raw, min));
+            }
+        }
+        if let Some(max) = spec.max {
+            if n > max {
+                return Some(format!("{} is greater than maximum {}", raw, max));
+            }
+        }
+    }
+
+    // Length checks for strings (also applies to url since url is stored as Str)
+    if matches!(value, EnvValue::Str(_)) {
+        let len = raw.chars().count();
+        if let Some(min) = spec.min_length {
+            if len < min {
+                return Some(format!(
+                    "length {} is less than minimum length {}",
+                    len, min
+                ));
+            }
+        }
+        if let Some(max) = spec.max_length {
+            if len > max {
+                return Some(format!(
+                    "length {} is greater than maximum length {}",
+                    len, max
+                ));
+            }
+        }
+    }
+
+    None
 }
 
 /// A parsed environment variable value.
@@ -201,6 +286,13 @@ impl EnvValue {
             EnvValue::Str(s) => Some(s),
             _ => None,
         }
+    }
+
+    /// Return the value rendered as an owned `String`, regardless of variant.
+    ///
+    /// Equivalent to `format!("{}", self)` but more discoverable.
+    pub fn as_string(&self) -> String {
+        self.to_string()
     }
 
     pub fn as_int(&self) -> Option<i64> {
@@ -573,5 +665,110 @@ mod tests {
         let e3 = ValidationError { errors: vec!["b".into()] };
         assert_eq!(e1, e2);
         assert_ne!(e1, e3);
+    }
+
+    #[test]
+    fn test_min_int() {
+        let src = source(&[("PORT", "100")]);
+        let err = Schema::new()
+            .integer("PORT")
+            .min(1024.0)
+            .build()
+            .validate_from(Some(&src))
+            .unwrap_err();
+        assert!(err.errors[0].contains("less than minimum"));
+    }
+
+    #[test]
+    fn test_max_int() {
+        let src = source(&[("PORT", "70000")]);
+        let err = Schema::new()
+            .integer("PORT")
+            .max(65535.0)
+            .build()
+            .validate_from(Some(&src))
+            .unwrap_err();
+        assert!(err.errors[0].contains("greater than maximum"));
+    }
+
+    #[test]
+    fn test_int_within_range() {
+        let src = source(&[("PORT", "8080")]);
+        let result = Schema::new()
+            .integer("PORT")
+            .min(1024.0)
+            .max(65535.0)
+            .build()
+            .validate_from(Some(&src))
+            .unwrap();
+        assert_eq!(result["PORT"].as_int().unwrap(), 8080);
+    }
+
+    #[test]
+    fn test_min_float() {
+        let src = source(&[("RATE", "0.05")]);
+        let err = Schema::new()
+            .float("RATE")
+            .min(0.1)
+            .build()
+            .validate_from(Some(&src))
+            .unwrap_err();
+        assert!(err.errors[0].contains("less than minimum"));
+    }
+
+    #[test]
+    fn test_min_length_string() {
+        let src = source(&[("PASSWORD", "abc")]);
+        let err = Schema::new()
+            .string("PASSWORD")
+            .min_length(8)
+            .build()
+            .validate_from(Some(&src))
+            .unwrap_err();
+        assert!(err.errors[0].contains("less than minimum length"));
+    }
+
+    #[test]
+    fn test_max_length_string() {
+        let src = source(&[("CODE", "abcdefghij")]);
+        let err = Schema::new()
+            .string("CODE")
+            .max_length(5)
+            .build()
+            .validate_from(Some(&src))
+            .unwrap_err();
+        assert!(err.errors[0].contains("greater than maximum length"));
+    }
+
+    #[test]
+    fn test_string_length_within_range() {
+        let src = source(&[("CODE", "abcdef")]);
+        let result = Schema::new()
+            .string("CODE")
+            .min_length(3)
+            .max_length(10)
+            .build()
+            .validate_from(Some(&src))
+            .unwrap();
+        assert_eq!(result["CODE"].as_str().unwrap(), "abcdef");
+    }
+
+    #[test]
+    fn test_field_count() {
+        let schema = Schema::new()
+            .string("A")
+            .build()
+            .integer("B")
+            .build()
+            .boolean("C")
+            .build();
+        assert_eq!(schema.field_count(), 3);
+    }
+
+    #[test]
+    fn test_env_value_as_string() {
+        assert_eq!(EnvValue::Str("hello".into()).as_string(), "hello");
+        assert_eq!(EnvValue::Int(42).as_string(), "42");
+        assert_eq!(EnvValue::Bool(true).as_string(), "true");
     }
 }

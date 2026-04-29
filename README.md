@@ -10,7 +10,7 @@ Typed environment variable validation with batch error reporting for Rust
 
 ```toml
 [dependencies]
-philiprehberger-env-validator = "0.3.8"
+philiprehberger-env-validator = "0.4.0"
 ```
 
 ## Usage
@@ -44,6 +44,23 @@ let endpoint = config["API_ENDPOINT"].as_str().unwrap();
 ```rust
 let config = Schema::new()
     .string("APP_ENV").choices(&["development", "staging", "production"]).build()
+    .validate()?;
+```
+
+### Numeric Range
+
+```rust
+let config = Schema::new()
+    .integer("PORT").min(1024.0).max(65535.0).build()
+    .float("RATE").min(0.0).max(1.0).build()
+    .validate()?;
+```
+
+### String Length
+
+```rust
+let config = Schema::new()
+    .string("PASSWORD").min_length(8).max_length(64).build()
     .validate()?;
 ```
 
@@ -103,10 +120,14 @@ assert_eq!(EnvValue::from(42i64), EnvValue::Int(42));
 | `builder.required(bool)` | Set whether the field is required (default: true) |
 | `builder.default_value(v)` | Set a default value for the field |
 | `builder.choices(list)` | Restrict allowed values to a set of choices |
+| `builder.min(v)` / `builder.max(v)` | Numeric range bounds (`integer` / `float`) |
+| `builder.min_length(n)` / `builder.max_length(n)` | String length bounds (`string` / `url`) |
 | `builder.build()` | Finalize the field and return the schema |
 | `schema.validate()` | Validate from environment variables |
 | `schema.validate_from(source)` | Validate from a custom `HashMap` source |
+| `schema.field_count()` | Number of fields registered in the schema |
 | `EnvValue` | Enum: `Str`, `Int`, `Float`, `Bool` |
+| `EnvValue.as_string()` | Render as `String` regardless of variant |
 | `ValidationError` | Error containing a `Vec<String>` of all failures |
 
 ## Development
